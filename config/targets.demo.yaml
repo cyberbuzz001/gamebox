@@ -1,0 +1,44 @@
+# Ready-to-run config for the LOCAL intentionally-vulnerable demo target.
+# The demo uses synthetic TEST_COINS on 127.0.0.1 only, so state changes are
+# enabled here. Financial/destructive operations remain blocked.
+target:
+  name: "GAMEBOX Local Demo"
+  environment: "sandbox"
+
+scope:
+  domains: ["127.0.0.1", "localhost"]
+  api_hosts: ["127.0.0.1", "localhost"]
+  excluded_hosts: []
+
+base_urls:
+  - "http://127.0.0.1:5099/"
+
+testing:
+  test_currency: "TEST_COINS"
+  max_requests_per_second: 50
+  accounts:
+    - label: "A"
+      username: "alice"
+      password: "alice-test-pw"     # synthetic demo credential (public, not a secret)
+    - label: "B"
+      username: "bob"
+      password: "bob-test-pw"
+    - label: "ADMIN"
+      username: "admin"
+      password: "admin-test-pw"    # TEST_ADMIN (synthetic) -- used to build the authz matrix
+
+safety:
+  allow_state_changes: true          # sandbox opt-in; TEST_COINS only
+  allow_financial_operations: false
+  allow_destructive_tests: false
+
+# Andar Bahar WebSocket demo target (local, TEST_COINS only).
+environment: "demo"          # demo | staging | production (production = read-only)
+websocket:
+  url: "ws://127.0.0.1:8765"
+  origin: "http://127.0.0.1:5099"
+  user_id: 1
+  victim_user_id: 2
+
+data_dir: "data"
+log_level: "INFO"

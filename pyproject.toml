@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gamebox-security-auditor"
+version = "0.1.0"
+description = "Authorized, safety-first black-box security assessment framework for gaming platforms"
+requires-python = ">=3.11"
+dependencies = ["requests>=2.31", "PyYAML>=6.0", "Flask>=3.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+gamebox = "gamebox.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gamebox*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

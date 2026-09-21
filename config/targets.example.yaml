@@ -1,0 +1,41 @@
+# GAMEBOX target configuration (EXAMPLE / TEMPLATE)
+# Copy to config/targets.yaml and edit. NEVER commit real credentials.
+# Credentials should come from environment variables via ${VAR} placeholders.
+
+target:
+  name: "Example Authorized Target"
+  environment: "staging"          # staging | production (be extra careful in production)
+
+# Only hosts listed here may be contacted. Empty => nothing is in scope (fail closed).
+scope:
+  domains:
+    - "staging.example-gaming.test"
+  api_hosts:
+    - "api.staging.example-gaming.test"
+  excluded_hosts:
+    - "payments.example-gaming.test"   # third-party / out of scope
+
+# Where discovery starts.
+base_urls:
+  - "https://staging.example-gaming.test/"
+
+testing:
+  test_currency: "TEST_COINS"
+  max_requests_per_second: 3
+  accounts:
+    - label: "A"
+      username: "${GAMEBOX_A_USERNAME}"
+      password: "${GAMEBOX_A_PASSWORD}"
+    - label: "B"
+      username: "${GAMEBOX_B_USERNAME}"
+      password: "${GAMEBOX_B_PASSWORD}"
+
+# Safety policy. Everything above SAFE_TEST is BLOCKED unless enabled here.
+# Enable state changes ONLY against an authorized sandbox using test currency.
+safety:
+  allow_state_changes: false
+  allow_financial_operations: false   # keep false: real deposits/withdrawals stay blocked
+  allow_destructive_tests: false
+
+data_dir: "data"
+log_level: "INFO"

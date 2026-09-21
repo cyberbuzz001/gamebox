@@ -1,0 +1,19 @@
+# secrets & local config
+.env
+config/targets.yaml
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+# runtime data (evidence/reports may contain target info)
+data/findings/
+data/evidence/
+data/reports/
+data/logs/
+*.sqlite3
+
+# stray OS files
+*.lnk

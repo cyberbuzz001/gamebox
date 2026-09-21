@@ -1,0 +1,45 @@
+# Full-coverage config for the LOCAL intentionally-vulnerable demo.
+# allow_financial_operations is enabled ONLY because this is a synthetic local
+# sandbox (TEST_COINS, 127.0.0.1) with no real money. NEVER enable this against
+# a real target.
+target:
+  name: "GAMEBOX Local Demo (full)"
+  environment: "sandbox"
+
+scope:
+  domains: ["127.0.0.1", "localhost"]
+  api_hosts: ["127.0.0.1", "localhost"]
+  excluded_hosts: []
+
+base_urls:
+  - "http://127.0.0.1:5099/"
+
+testing:
+  test_currency: "TEST_COINS"
+  max_requests_per_second: 50
+  accounts:
+    - label: "A"
+      username: "alice"
+      password: "alice-test-pw"
+    - label: "B"
+      username: "bob"
+      password: "bob-test-pw"
+    - label: "ADMIN"
+      username: "admin"
+      password: "admin-test-pw"    # TEST_ADMIN (synthetic) -- used to build the authz matrix
+
+safety:
+  allow_state_changes: true
+  allow_financial_operations: true    # sandbox only -- synthetic TEST_COINS
+  allow_destructive_tests: false
+
+# Andar Bahar WebSocket demo target (local, TEST_COINS only).
+environment: "demo"          # demo | staging | production (production = read-only)
+websocket:
+  url: "ws://127.0.0.1:8765"
+  origin: "http://127.0.0.1:5099"
+  user_id: 1
+  victim_user_id: 2
+
+data_dir: "data"
+log_level: "INFO"

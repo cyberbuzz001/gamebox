@@ -1,0 +1,10 @@
+# Scanner behavior defaults (target-independent).
+http:
+  timeout_seconds: 15
+  user_agent: "gamebox-security-auditor/0.1 (authorized-test)"
+discovery:
+  max_pages: 60
+modules:
+  wallet: true
+  games: true
+  authorization: true

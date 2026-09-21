@@ -1,0 +1,15 @@
+services:
+  demo:
+    build: .
+    command: python -m tests.fixtures.demo_game.app --port 5099
+    ports:
+      - "127.0.0.1:5099:5099"   # localhost only
+  scanner:
+    build: .
+    depends_on: [demo]
+    # Point the demo config at the compose service host and run the full loop.
+    command: >
+      sh -c "sleep 2;
+             sed 's#127.0.0.1:5099#demo:5099#; s#\[\"127.0.0.1\", \"localhost\"\]#[\"demo\",\"localhost\"]#'
+                 config/targets.demo.yaml > config/targets.yaml &&
+             gamebox discover && gamebox scan && gamebox report"
