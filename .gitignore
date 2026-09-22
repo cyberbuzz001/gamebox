@@ -1,6 +1,7 @@
 # secrets & local config
 .env
 config/targets.yaml
+
 # python
 __pycache__/
 *.py[cod]
@@ -8,12 +9,15 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+.pytest_tmp/
+.skillspector-venv/
+.third_party/
+
 # runtime data (evidence/reports may contain target info)
-data/findings/
-data/evidence/
-data/reports/
-data/logs/
+data/
 *.sqlite3
 
 # stray OS files
 *.lnk
+.DS_Store
+Thumbs.db

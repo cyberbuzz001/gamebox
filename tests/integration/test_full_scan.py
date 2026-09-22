@@ -37,6 +37,8 @@ def _run(base, tmp):
     return cfg, db, result
 
 
+
+
 def test_full_scan_covers_all_modules(demo_server):
     with tempfile.TemporaryDirectory() as tmp:
         cfg, db, result = _run(demo_server, tmp)

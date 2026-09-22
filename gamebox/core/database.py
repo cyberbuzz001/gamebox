@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS findings (
     title TEXT, category TEXT, severity TEXT, confidence TEXT,
     description TEXT, endpoint TEXT, parameter TEXT, impact TEXT,
     reproduction TEXT, remediation TEXT, cwe TEXT, owasp TEXT,
-    module TEXT, timestamp REAL, evidence TEXT
+    module TEXT, timestamp REAL, evidence TEXT, status TEXT DEFAULT 'Open'
 );
 CREATE TABLE IF NOT EXISTS evidence (
     id TEXT PRIMARY KEY, finding_id TEXT, data TEXT
@@ -31,7 +31,47 @@ CREATE TABLE IF NOT EXISTS evidence (
 CREATE TABLE IF NOT EXISTS artifacts (
     key TEXT PRIMARY KEY, data TEXT
 );
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY, username TEXT UNIQUE, email TEXT, role TEXT, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY, name TEXT, description TEXT, owner_id TEXT, created_at REAL, updated_at REAL
+);
+CREATE TABLE IF NOT EXISTS targets (
+    id TEXT PRIMARY KEY, project_id TEXT, name TEXT, base_url TEXT, environment TEXT, status TEXT, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS target_scopes (
+    id TEXT PRIMARY KEY, target_id TEXT, hostname TEXT, path TEXT, scope_type TEXT, enabled INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS test_accounts (
+    id TEXT PRIMARY KEY, target_id TEXT, name TEXT, username TEXT, role TEXT, credentials_reference TEXT, is_test_account INTEGER DEFAULT 1, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS scan_profiles (
+    id TEXT PRIMARY KEY, name TEXT, description TEXT, modules_json TEXT, configuration_json TEXT, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS scan_jobs (
+    id TEXT PRIMARY KEY, target_id TEXT, scan_type TEXT, status TEXT, started_at REAL, completed_at REAL, worker_id TEXT, configuration_json TEXT
+);
+CREATE TABLE IF NOT EXISTS scan_results (
+    id TEXT PRIMARY KEY, scan_id TEXT, target_id TEXT, findings_count INTEGER, safety_counters_json TEXT, duration_seconds REAL, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS security_tests (
+    id TEXT PRIMARY KEY, target_id TEXT, category TEXT, test_name TEXT, expected_behavior TEXT, observed_behavior TEXT, status TEXT, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS remediation (
+    id TEXT PRIMARY KEY, finding_id TEXT, root_cause TEXT, affected_files TEXT, recommended_architecture TEXT, patch_diff TEXT, status TEXT, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS verification_tests (
+    id TEXT PRIMARY KEY, finding_id TEXT, test_name TEXT, execution_time REAL, result TEXT, details TEXT, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY, target_id TEXT, report_type TEXT, format TEXT, file_path TEXT, created_at REAL
+);
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id TEXT PRIMARY KEY, user TEXT, action TEXT, target TEXT, details TEXT, timestamp REAL
+);
 """
+
 
 
 class Database:

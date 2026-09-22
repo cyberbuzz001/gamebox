@@ -20,7 +20,7 @@ from . import __version__
 from .core.config import Config
 from .core.database import Database
 from .core.logger import configure, get_logger
-from .core.scheduler import ALL_MODULES, DEFAULT_MODULES, Orchestrator
+from .core.scheduler import DEFAULT_MODULES, Orchestrator, available_modules
 from .discovery.crawler import Crawler
 from .http.client import SafeHTTPClient
 from .reporting import report as report_mod
@@ -264,6 +264,19 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gui(args: argparse.Namespace) -> int:
+    from .gui import app
+    if args.host not in {"127.0.0.1", "localhost", "::1"}:
+        if not app.config.get("GUI_ADMIN_SECRET"):
+            print("Refusing non-local GUI binding: set GAMEBOX_GUI_ADMIN_SECRET first.",
+                  file=sys.stderr)
+            return 2
+        app.config["REQUIRE_GUI_AUTH"] = True
+    print(f"GAMEBOX GUI: http://{args.host}:{args.port}")
+    app.run(host=args.host, port=args.port, debug=False)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="gamebox", description="GAMEBOX Security Auditor")
     p.add_argument("--version", action="version", version=f"gamebox {__version__}")
@@ -280,8 +293,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("map", help="print application map").set_defaults(func=cmd_map)
 
     sp = sub.add_parser("scan", help="run analyzers (safe by default)")
-    sp.add_argument("--module", action="append", choices=ALL_MODULES, metavar="MODULE",
-                    help="limit to module(s); repeatable. Choices: " + ", ".join(ALL_MODULES))
+    module_choices = available_modules()
+    sp.add_argument("--module", action="append", choices=module_choices, metavar="MODULE",
+                    help="limit to module(s); repeatable. Choices: " + ", ".join(module_choices))
     sp.add_argument("--safe", action="store_true",
                     help="documentation flag: scanning is safe/opt-in by design")
     sp.set_defaults(func=cmd_scan)
@@ -304,6 +318,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(func=cmd_report)
 
     sub.add_parser("status", help="show stats").set_defaults(func=cmd_status)
+    sp = sub.add_parser("gui", help="launch the local browser GUI")
+    sp.add_argument("--host", default="127.0.0.1")
+    sp.add_argument("--port", type=int, default=8765)
+    sp.set_defaults(func=cmd_gui)
     return p
 
 

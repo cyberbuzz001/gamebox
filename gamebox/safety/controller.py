@@ -46,6 +46,10 @@ class SafetyController:
         self.config = config
         self.scope = ScopeManager(config.scope)
         self.allowed_classes = config.safety.allowed_classes()
+        # Live/production targets are always read-only, independently of the
+        # YAML or GUI options, so sandbox permissions cannot leak into them.
+        if config.target.environment.lower() in {"production", "prod", "live"}:
+            self.allowed_classes = {RequestClass.READ_ONLY, RequestClass.SAFE_TEST}
         self._blocked_count = 0
         self._allowed_count = 0
 

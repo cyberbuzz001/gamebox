@@ -26,7 +26,7 @@ class AccountSession:
 
 
 def authenticate(client: SafeHTTPClient, base_url: str, account: Account,
-                 login_path: str = "/api/auth/login") -> Optional[AccountSession]:
+                 login_path: str | None = None) -> Optional[AccountSession]:
     """Log an account in against the demo/target and return a session.
 
     Login is a STATE_CHANGING operation, so this only succeeds when the
@@ -34,7 +34,7 @@ def authenticate(client: SafeHTTPClient, base_url: str, account: Account,
     """
     if account.token:
         return AccountSession(label=account.label, token=account.token)
-    url = base_url.rstrip("/") + login_path
+    url = base_url.rstrip("/") + (login_path or "/api/auth/login")
     try:
         resp, _ = client.post(
             url, json_body={"username": account.username, "password": account.password}

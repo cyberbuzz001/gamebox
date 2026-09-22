@@ -134,6 +134,40 @@ and a plain `gamebox scan`.
 parses links/forms, and mines JavaScript for API paths, then stores an endpoint
 inventory. It never submits forms or changes state.
 
+## Browser GUI and online authorized targets
+
+Start the local GUI with `gamebox gui` and open `http://127.0.0.1:8765`.
+Enter the complete URL of an authorized staging or production target, confirm
+authorization, and optionally provide a dedicated test account or bearer token.
+The GUI derives a host allow-list from that URL, keeps credentials in memory,
+and uses the same scope and safety gate as the CLI. Production targets are
+forced read-only regardless of the selected options.
+
+The GUI exposes every registered scan module, including opt-in replay, race,
+deep-JWT, and schema-fuzz checks. Scans run as tracked background jobs and can
+be monitored from the job-status link. Optional named integrations (SecLists,
+payload dictionaries, jwt_tool, graphql-cop, and Schemathesis) can be supplied
+as local paths; unavailable tools are skipped and no arbitrary shell commands
+are accepted by the GUI.
+
+### Analyzer plugins
+
+Installable packages may expose a `gamebox.analyzers` entry point. The entry
+point receives `register_analyzer` and registers a factory with the same
+scope-controlled `ScanContext` used by built-in modules:
+
+```python
+def register(register_analyzer):
+    def factory(ctx):
+        def run():
+            return []  # return Finding objects
+        return run
+    register_analyzer("my_check", factory)
+```
+
+This keeps new analyzers inside the scheduler and safety boundary instead of
+adding arbitrary script execution to the GUI.
+
 ## 7. Running safe scans
 
 `gamebox scan` authenticates your configured test accounts and runs the

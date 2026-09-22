@@ -11,6 +11,7 @@ import html
 import io
 import json
 import time
+import re
 from pathlib import Path
 
 from ..core.config import Config
@@ -37,8 +38,43 @@ def _security_score(findings: list[Finding]) -> int:
     return max(0, 100 - sum(weights[f.severity] for f in findings))
 
 
+def _spa_fallback(f: Finding) -> bool:
+    """Identify conservative SPA shell responses for admin-path findings.
+
+    A 200 HTML shell is not evidence that an admin route is accessible. Only
+    findings with admin-like endpoints and strong SPA markers are filtered.
+    """
+    endpoint = (f.endpoint or "").lower()
+    if "admin" not in endpoint and "administrator" not in endpoint:
+        return False
+    markers = ("<!doctype html", "<div id=\"root\"", "<div id=\"app\"",
+               "<script type=\"module\"")
+    for evidence in f.evidence:
+        content_type = " ".join(f"{k}:{v}" for k, v in evidence.response_headers.items()).lower()
+        excerpt = (evidence.response_excerpt or "").lower()
+        if evidence.status_code == 200 and "text/html" in content_type and any(m in excerpt for m in markers):
+            return True
+    return False
+
+
+def effective_findings(db: Database) -> list[Finding]:
+    """Return deduplicated findings with strong SPA-shell false positives removed."""
+    result: list[Finding] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for finding in db.findings():
+        if _spa_fallback(finding):
+            continue
+        key = (re.sub(r"\s+", " ", finding.title.strip().lower()),
+               finding.module, finding.endpoint, finding.parameter)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(finding)
+    return result
+
+
 def build_summary(config: Config, db: Database) -> dict:
-    findings = db.findings()
+    findings = effective_findings(db)
     return {
         "target": config.target.name or "(unnamed)",
         "environment": config.target.environment,
@@ -53,7 +89,7 @@ def game_assessment(db: Database) -> list[dict]:
 
 
 def chains(db: Database) -> list[dict]:
-    return [c.to_dict() for c in attack_chains.correlate(db.findings())]
+    return [c.to_dict() for c in attack_chains.correlate(effective_findings(db))]
 
 
 def to_json(config: Config, db: Database) -> str:
@@ -65,7 +101,7 @@ def to_json(config: Config, db: Database) -> str:
         "games": game_assessment(db),
         "admin_assessment": db.get_artifact("admin_assessment"),
         "attack_chains": chains(db),
-        "findings": [f.to_dict() for f in db.findings()],
+        "findings": [f.to_dict() for f in effective_findings(db)],
     }, indent=2)
 
 
@@ -74,7 +110,7 @@ def to_csv(db: Database) -> str:
     w = csv.writer(buf)
     w.writerow(["id", "severity", "confidence", "category", "title", "endpoint",
                 "cwe", "owasp", "module"])
-    for f in db.findings():
+    for f in effective_findings(db):
         w.writerow([f.id, f.severity.value, f.confidence.value, f.category.value,
                     f.title, f.endpoint, f.cwe, f.owasp, f.module])
     return buf.getvalue()
@@ -148,7 +184,7 @@ def _admin_section_md(db: Database) -> list[str]:
 
 def to_markdown(config: Config, db: Database) -> str:
     summary = build_summary(config, db)
-    findings = db.findings()
+    findings = effective_findings(db)
     endpoints = db.endpoints()
     lines: list[str] = []
     a = lines.append
@@ -236,7 +272,7 @@ def to_markdown(config: Config, db: Database) -> str:
 def to_html(config: Config, db: Database) -> str:
     """Static summary HTML (kept simple). The interactive view is dashboard.html."""
     summary = build_summary(config, db)
-    findings = db.findings()
+    findings = effective_findings(db)
     sev = summary["findings_by_severity"]
     colors = {"CRITICAL": "#b00020", "HIGH": "#d9534f", "MEDIUM": "#e0a800",
               "LOW": "#5bc0de", "INFO": "#777"}
@@ -284,7 +320,7 @@ def to_dashboard(config: Config, db: Database) -> str:
     category/confidence). Data is embedded so it works from file://."""
     data = json.dumps({
         "summary": build_summary(config, db),
-        "findings": [f.to_dict() for f in db.findings()],
+        "findings": [f.to_dict() for f in effective_findings(db)],
         "chains": chains(db),
         "admin": db.get_artifact("admin_assessment"),
     })

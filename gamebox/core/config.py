@@ -113,6 +113,7 @@ class Config:
     environment: str = "demo"
     data_dir: str = "data"
     log_level: str = "INFO"
+    login_path: str = "/api/auth/login"
 
     @classmethod
     def load(cls, path: str | Path) -> "Config":
@@ -173,6 +174,7 @@ class Config:
             base_urls=list(raw.get("base_urls", []) or []),
             data_dir=raw.get("data_dir", "data"),
             log_level=raw.get("log_level", "INFO"),
+            login_path=raw.get("login_path", "/api/auth/login"),
         )
 
     def account(self, label: str) -> Account | None:

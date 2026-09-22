@@ -231,6 +231,26 @@ def create_app() -> Flask:
         return jsonify({"round_id": round_id, "credited": 250,
                         "balance": u["balance"], "currency": TEST_CURRENCY})
 
+    @app.post("/api/wallet/negative-bet")
+    def negative_bet():
+        _, u = current_user()
+        if not u:
+            return jsonify({"error": "unauthorized"}), 401
+        data = request.get_json(silent=True) or {}
+        amount = float(data.get("amount", 0))
+        u["balance"] -= amount                             # VULN 29: accepts negative amounts
+        return jsonify({"debited": amount, "balance": u["balance"], "currency": TEST_CURRENCY})
+
+    @app.post("/api/game/bet/cancel")
+    def bet_cancel():
+        _, u = current_user()
+        if not u:
+            return jsonify({"error": "unauthorized"}), 401
+        data = request.get_json(silent=True) or {}
+        u["balance"] += 100                                # VULN 30: no lock on cancellation
+        return jsonify({"cancelled": True, "refunded": 100, "balance": u["balance"], "currency": TEST_CURRENCY})
+
+
     # ---- injection-family demos -----------------------------------------
     @app.get("/api/search")
     def search():
