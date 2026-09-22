@@ -61,6 +61,32 @@ def create_app() -> Flask:
     processed_orders: set[str] = set()
     login_attempts: list[str] = []
 
+    # Mutable game configuration — editable from the Security Lab GUI.
+    # These values drive odds/RTP/house-edge and per-game payout caps.
+    game_config = {
+        "house_edge": 0.03,
+        "max_bet": 100000,
+        "min_bet": 10,
+        "rtp": {
+            "teenpatti": 0.97,
+            "rummy": 0.96,
+            "andar_bahar": 0.975,
+            "slots": 0.94,
+        },
+        "payout_multipliers": {
+            "teenpatti_trail": 50,
+            "teenpatti_pure_sequence": 30,
+            "teenpatti_sequence": 20,
+            "teenpatti_color": 10,
+            "teenpatti_pair": 5,
+            "andar_bahar_first_deal": 10,
+            "andar_bahar_normal": 1.9,
+        },
+        "bonus_amount": 100,
+        "settlement_credit": 250,
+        "maintenance_mode": False,
+    }
+
     def _access_token(u: dict) -> str:
         # VULN 21: unsigned "JWT-style" token -- role claim is client-forgeable.
         import base64
@@ -368,6 +394,68 @@ def create_app() -> Flask:
     def admin_delete_user(user_id: int):
         # Destructive admin op. NO-OP in the demo; the scanner must never reach it.
         return jsonify({"would_delete": user_id, "note": "no-op in demo; not applied"})
+
+    # ---- live config editor endpoints (for Security Lab GUI) --------
+    @app.get("/api/admin/game-config")
+    def get_game_config():
+        """Return the full mutable game configuration (odds, RTP, payouts)."""
+        return jsonify({"config": game_config, "users": [
+            {"username": uname, "user_id": u["user_id"], "balance": u["balance"],
+             "role": u["role"]}
+            for uname, u in users.items()
+        ]})
+
+    @app.put("/api/admin/game-config")
+    def put_game_config():
+        """Update game configuration values (house_edge, RTP, payout multipliers, etc.).
+
+        Accepts a JSON body with any subset of game_config keys.
+        Nested dicts (rtp, payout_multipliers) are merged, not replaced.
+        """
+        data = request.get_json(silent=True) or {}
+        changes = []
+        for key in ("house_edge", "max_bet", "min_bet", "bonus_amount",
+                     "settlement_credit", "maintenance_mode"):
+            if key in data:
+                old = game_config[key]
+                game_config[key] = data[key]
+                changes.append({"field": key, "old": old, "new": data[key]})
+        # Merge nested dicts
+        for nested_key in ("rtp", "payout_multipliers"):
+            if nested_key in data and isinstance(data[nested_key], dict):
+                for sub_key, sub_val in data[nested_key].items():
+                    old = game_config[nested_key].get(sub_key)
+                    game_config[nested_key][sub_key] = sub_val
+                    changes.append({"field": f"{nested_key}.{sub_key}",
+                                    "old": old, "new": sub_val})
+        return jsonify({"applied": True, "changes": changes, "config": game_config})
+
+    @app.put("/api/admin/users/coins")
+    def set_user_coins():
+        """Directly set a user's TEST_COINS balance.
+
+        JSON body: {"username": "alice", "balance": 5000}
+        """
+        data = request.get_json(silent=True) or {}
+        username = data.get("username", "")
+        new_balance = data.get("balance")
+        if username not in users:
+            return jsonify({"error": f"User '{username}' not found"}), 404
+        if new_balance is None:
+            return jsonify({"error": "balance field is required"}), 400
+        try:
+            new_balance = float(new_balance)
+        except (ValueError, TypeError):
+            return jsonify({"error": "balance must be a number"}), 400
+        old_balance = users[username]["balance"]
+        users[username]["balance"] = new_balance
+        return jsonify({
+            "applied": True,
+            "username": username,
+            "old_balance": old_balance,
+            "new_balance": new_balance,
+            "currency": TEST_CURRENCY,
+        })
 
     # ---- graphql (crude, deliberately weak) -----------------------------
     @app.post("/graphql")

@@ -237,6 +237,9 @@ _HTML = """<!doctype html>
     <a href="/?tab=game-security" class="nav-item {{ 'active' if active_tab == 'game-security' else '' }}">
       <span>🎲</span> Game Security
     </a>
+    <a href="/?tab=game-config" class="nav-item {{ 'active' if active_tab == 'game-config' else '' }}">
+      <span>🎰</span> Game Config Editor
+    </a>
 
     <div class="nav-group">Vulnerabilities</div>
     <a href="/?tab=findings" class="nav-item {{ 'active' if active_tab == 'findings' else '' }}">
@@ -847,6 +850,252 @@ Authorization: Bearer test-token</textarea>
           </div>
         </div>
       </section>
+
+    {# ------------------------------------------------------------- #}
+    {# TAB 8b: GAME CONFIG EDITOR (LIVE ODDS & COINS)               #}
+    {# ------------------------------------------------------------- #}
+    {% elif active_tab == 'game-config' %}
+      <section class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div>
+            <h2>🎰 Game Config Editor</h2>
+            <p class="subtitle">Live-edit house edge, RTP, payout multipliers, and user TEST_COIN balances on the demo target.</p>
+          </div>
+          <button class="btn" id="btn-load-config" onclick="loadGameConfig()">🔄 Load Live Config</button>
+        </div>
+
+        <div id="config-status" class="msg-banner msg-info" style="display:none;"></div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+          <!-- LEFT: Game Odds & Settings -->
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:15px; color:var(--accent); margin-bottom:14px;">⚙️ Core Game Settings</h3>
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                <div>
+                  <label>House Edge (%)</label>
+                  <input id="cfg-house-edge" type="number" step="0.001" value="0.03" placeholder="0.03">
+                </div>
+                <div>
+                  <label>Max Bet</label>
+                  <input id="cfg-max-bet" type="number" step="100" value="100000">
+                </div>
+                <div>
+                  <label>Min Bet</label>
+                  <input id="cfg-min-bet" type="number" step="1" value="10">
+                </div>
+                <div>
+                  <label>Bonus Claim Amount</label>
+                  <input id="cfg-bonus-amount" type="number" step="10" value="100">
+                </div>
+                <div>
+                  <label>Settlement Credit</label>
+                  <input id="cfg-settlement-credit" type="number" step="10" value="250">
+                </div>
+                <div>
+                  <label>Maintenance Mode</label>
+                  <select id="cfg-maintenance">
+                    <option value="false">Off</option>
+                    <option value="true">On</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn" style="margin-top:12px;" onclick="saveGameSettings()">💾 Save Core Settings</button>
+            </div>
+
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:15px; color:var(--accent); margin-bottom:14px;">📊 RTP (Return to Player)</h3>
+              <div id="rtp-fields" class="form-grid" style="grid-template-columns: 1fr 1fr;"></div>
+              <button class="btn btn-sec" style="margin-top:12px;" onclick="saveRTP()">💾 Update RTP Values</button>
+            </div>
+
+            <div class="card">
+              <h3 style="font-size:15px; color:var(--accent); margin-bottom:14px;">🎯 Payout Multipliers</h3>
+              <div id="payout-fields" class="form-grid" style="grid-template-columns: 1fr 1fr;"></div>
+              <button class="btn btn-sec" style="margin-top:12px;" onclick="savePayouts()">💾 Update Payouts</button>
+            </div>
+          </div>
+
+          <!-- RIGHT: User Coins Editor -->
+          <div>
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="font-size:15px; color:var(--accent); margin-bottom:14px;">🪙 User Coin Balances</h3>
+              <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Directly set any user's TEST_COIN balance. Changes take effect immediately on the demo server.</p>
+              <div id="user-coins-list"></div>
+            </div>
+
+            <div class="card">
+              <h3 style="font-size:15px; color:var(--accent); margin-bottom:14px;">📝 Change Log</h3>
+              <pre id="config-changelog" style="font-family:monospace; font-size:12px; color:#94a3b8; max-height:280px; overflow-y:auto; background:#0b0f19; padding:12px; border-radius:6px;">Load config and make changes to see the log here.</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <script>
+        let _changeLog = [];
+        function _logChange(msg) {
+          _changeLog.unshift('[' + new Date().toLocaleTimeString() + '] ' + msg);
+          document.getElementById('config-changelog').innerText = _changeLog.join('\n');
+        }
+        function _showStatus(msg, isError) {
+          const el = document.getElementById('config-status');
+          el.style.display = 'block';
+          el.className = 'msg-banner ' + (isError ? 'msg-error' : 'msg-info');
+          el.innerText = msg;
+          setTimeout(() => { el.style.display = 'none'; }, 4000);
+        }
+
+        async function loadGameConfig() {
+          const btn = document.getElementById('btn-load-config');
+          btn.disabled = true; btn.innerText = 'Loading...';
+          try {
+            const res = await fetch('/api/game-config/read');
+            const data = await res.json();
+            if (data.error) { _showStatus('Error: ' + data.error, true); return; }
+
+            const cfg = data.config;
+            document.getElementById('cfg-house-edge').value = cfg.house_edge;
+            document.getElementById('cfg-max-bet').value = cfg.max_bet;
+            document.getElementById('cfg-min-bet').value = cfg.min_bet;
+            document.getElementById('cfg-bonus-amount').value = cfg.bonus_amount;
+            document.getElementById('cfg-settlement-credit').value = cfg.settlement_credit;
+            document.getElementById('cfg-maintenance').value = cfg.maintenance_mode ? 'true' : 'false';
+
+            // RTP fields
+            const rtpDiv = document.getElementById('rtp-fields');
+            rtpDiv.innerHTML = '';
+            for (const [game, val] of Object.entries(cfg.rtp)) {
+              rtpDiv.innerHTML += `<div><label>${game}</label><input id="rtp-${game}" type="number" step="0.001" min="0" max="1" value="${val}"></div>`;
+            }
+
+            // Payout multiplier fields
+            const payDiv = document.getElementById('payout-fields');
+            payDiv.innerHTML = '';
+            for (const [name, val] of Object.entries(cfg.payout_multipliers)) {
+              const label = name.replace(/_/g, ' ');
+              payDiv.innerHTML += `<div><label>${label}</label><input id="pay-${name}" type="number" step="0.1" value="${val}"></div>`;
+            }
+
+            // User coin balances
+            const usersDiv = document.getElementById('user-coins-list');
+            usersDiv.innerHTML = '';
+            for (const u of data.users) {
+              usersDiv.innerHTML += `
+                <div style="display:flex; align-items:center; gap:12px; padding:10px; border-bottom:1px solid var(--border);">
+                  <div style="flex:1;">
+                    <b style="font-size:13px;">${u.username}</b>
+                    <span class="badge badge-INFO" style="margin-left:6px;">${u.role}</span>
+                    <div style="font-size:11px; color:var(--text-muted)">User ID: ${u.user_id}</div>
+                  </div>
+                  <input id="coins-${u.username}" type="number" step="100" value="${u.balance}"
+                         style="width:120px; text-align:right; font-weight:700; font-size:14px;">
+                  <button class="btn btn-sec" style="padding:6px 10px; font-size:11px;"
+                          onclick="setUserCoins('${u.username}')">Set</button>
+                </div>`;
+            }
+
+            _showStatus('Live config loaded from ' + (data._source || 'demo server'), false);
+            _logChange('Config loaded from target server');
+          } catch (e) {
+            _showStatus('Failed to load config: ' + e, true);
+          } finally {
+            btn.disabled = false; btn.innerText = '🔄 Load Live Config';
+          }
+        }
+
+        async function saveGameSettings() {
+          const body = {
+            house_edge: parseFloat(document.getElementById('cfg-house-edge').value),
+            max_bet: parseInt(document.getElementById('cfg-max-bet').value),
+            min_bet: parseInt(document.getElementById('cfg-min-bet').value),
+            bonus_amount: parseInt(document.getElementById('cfg-bonus-amount').value),
+            settlement_credit: parseInt(document.getElementById('cfg-settlement-credit').value),
+            maintenance_mode: document.getElementById('cfg-maintenance').value === 'true',
+          };
+          try {
+            const res = await fetch('/api/game-config/write', {
+              method: 'PUT',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.applied) {
+              _showStatus('Core settings saved (' + data.changes.length + ' changes applied)', false);
+              for (const c of data.changes) _logChange(`${c.field}: ${c.old} → ${c.new}`);
+            } else {
+              _showStatus('Error: ' + JSON.stringify(data), true);
+            }
+          } catch (e) {
+            _showStatus('Save failed: ' + e, true);
+          }
+        }
+
+        async function saveRTP() {
+          const rtp = {};
+          document.querySelectorAll('[id^="rtp-"]').forEach(el => {
+            rtp[el.id.replace('rtp-', '')] = parseFloat(el.value);
+          });
+          try {
+            const res = await fetch('/api/game-config/write', {
+              method: 'PUT',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({rtp})
+            });
+            const data = await res.json();
+            if (data.applied) {
+              _showStatus('RTP values updated (' + data.changes.length + ' changes)', false);
+              for (const c of data.changes) _logChange(`${c.field}: ${c.old} → ${c.new}`);
+            }
+          } catch (e) {
+            _showStatus('RTP save failed: ' + e, true);
+          }
+        }
+
+        async function savePayouts() {
+          const payouts = {};
+          document.querySelectorAll('[id^="pay-"]').forEach(el => {
+            payouts[el.id.replace('pay-', '')] = parseFloat(el.value);
+          });
+          try {
+            const res = await fetch('/api/game-config/write', {
+              method: 'PUT',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({payout_multipliers: payouts})
+            });
+            const data = await res.json();
+            if (data.applied) {
+              _showStatus('Payout multipliers updated (' + data.changes.length + ' changes)', false);
+              for (const c of data.changes) _logChange(`${c.field}: ${c.old} → ${c.new}`);
+            }
+          } catch (e) {
+            _showStatus('Payout save failed: ' + e, true);
+          }
+        }
+
+        async function setUserCoins(username) {
+          const balance = parseFloat(document.getElementById('coins-' + username).value);
+          try {
+            const res = await fetch('/api/game-config/coins', {
+              method: 'PUT',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({username, balance})
+            });
+            const data = await res.json();
+            if (data.applied) {
+              _showStatus(`${username}: ${data.old_balance} → ${data.new_balance} TEST_COINS`, false);
+              _logChange(`${username} balance: ${data.old_balance} → ${data.new_balance}`);
+            } else {
+              _showStatus('Error: ' + (data.error || JSON.stringify(data)), true);
+            }
+          } catch (e) {
+            _showStatus('Coin update failed: ' + e, true);
+          }
+        }
+
+        // Auto-load on page visit
+        loadGameConfig();
+      </script>
 
     {# ------------------------------------------------------------- #}
     {# TAB 9: FINDINGS & VULNERABILITY MANAGEMENT                     #}
@@ -1862,6 +2111,61 @@ def verify_finding(finding_id: str):
         "response_status": status_code,
         "details": details,
     })
+
+# --------------------------------------------------------------------------
+# GAME CONFIG EDITOR PROXY APIs
+# --------------------------------------------------------------------------
+
+@app.get("/api/game-config/read")
+def game_config_read():
+    """Proxy: fetch live game config from the demo target server."""
+    cfg = _state.get("config")
+    base_url = (cfg.base_urls[0] if cfg and cfg.base_urls else "http://127.0.0.1:5099").rstrip("/")
+    import requests as _req
+    try:
+        r = _req.get(f"{base_url}/api/admin/game-config", timeout=3)
+        data = r.json()
+        data["_source"] = base_url
+        _log_audit("GAME_CONFIG_READ", base_url, "Game config loaded from target")
+        return jsonify(data)
+    except Exception as exc:
+        return jsonify({"error": f"Failed to read config: {exc}"}), 502
+
+@app.route("/api/game-config/write", methods=["PUT"])
+def game_config_write():
+    """Proxy: push game config changes to the demo target server."""
+    cfg = _state.get("config")
+    base_url = (cfg.base_urls[0] if cfg and cfg.base_urls else "http://127.0.0.1:5099").rstrip("/")
+    data = request.get_json() or {}
+    import requests as _req
+    try:
+        r = _req.put(f"{base_url}/api/admin/game-config",
+                     json=data, timeout=3)
+        result = r.json()
+        changes = result.get("changes", [])
+        _log_audit("GAME_CONFIG_UPDATED", base_url,
+                   f"{len(changes)} config changes applied")
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"error": f"Failed to write config: {exc}"}), 502
+
+@app.route("/api/game-config/coins", methods=["PUT"])
+def game_config_coins():
+    """Proxy: set a user's TEST_COIN balance on the demo target."""
+    cfg = _state.get("config")
+    base_url = (cfg.base_urls[0] if cfg and cfg.base_urls else "http://127.0.0.1:5099").rstrip("/")
+    data = request.get_json() or {}
+    import requests as _req
+    try:
+        r = _req.put(f"{base_url}/api/admin/users/coins",
+                     json=data, timeout=3)
+        result = r.json()
+        if result.get("applied"):
+            _log_audit("USER_COINS_SET", data.get("username", "?"),
+                       f"Balance set to {data.get('balance')} TEST_COINS")
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"error": f"Failed to update coins: {exc}"}), 502
 
 # --------------------------------------------------------------------------
 # REPORT GENERATION & DOWNLOADS
